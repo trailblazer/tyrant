@@ -25,7 +25,9 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "bundler", "~> 2.0"
   spec.add_development_dependency "rake", "~> 10.0"
   spec.add_development_dependency "minitest", "~> 5.0"
+  spec.add_development_dependency "trailblazer-test"
 
   spec.add_dependency "trailblazer-activity-dsl-linear"#, ">= 0.10.0"
   spec.add_dependency "trailblazer-developer"
+  spec.add_dependency "dry-struct"
 end
