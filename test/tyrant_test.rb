@@ -34,7 +34,7 @@ class TyrantTest < Minitest::Spec
       step Tyrant::Auth.method(:des_assigned)
       step Tyrant::Auth.method(:timestamp)
 
-      step :normalize
+      step Tyrant::Auth.method(:create_credentials), output: {credentials: :api_auth_data}
       # step Tyrant::Auth.method(:decrypt_value)
 
       def create_random_key(ctx, **)
@@ -43,10 +43,6 @@ class TyrantTest < Minitest::Spec
 
       def validate(ctx, username:, **)
         username.size > 0
-      end
-
-      def normalize(ctx, username:, encrypted_value:, created_at:, state:, type:, **)
-        ctx[:api_auth_data] = Tyrant::Auth::Credentials.new({username: username, password: encrypted_value, created_at: created_at, state: state, type: type}) # TODO: use Tyrant "object"
       end
     end
 

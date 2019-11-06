@@ -41,6 +41,10 @@ module Tyrant
       ctx[:type] = "des-cipher"
     end
 
+    def create_credentials(ctx, username:, encrypted_value:, created_at:, state:, type:, **)
+      ctx[:credentials] = Tyrant::Auth::Credentials.new({username: username, password: encrypted_value, created_at: created_at, state: state, type: type})
+    end
+
     require 'dry-struct'
 
     module Types
