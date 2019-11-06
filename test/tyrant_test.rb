@@ -9,7 +9,7 @@ module Tyrant
 
   def call(activity, ctx)
     signal, (ctx, _) = Trailblazer::Developer.wtf?(activity, [ctx, {}])
-    ctx
+    return ctx, signal.to_h[:semantic] == :success
   end
 
   require "securerandom"
@@ -32,6 +32,10 @@ module Tyrant
       s = [encrypted_value].pack("H*").unpack("C*").pack("c*")
 
       ctx[:decrypted_value] = cipher.update(s) + cipher.final
+    end
+
+    def compare_passwords(ctx, decrypted_value:, password:, **)
+      password == decrypted_value
     end
 
 
@@ -77,7 +81,7 @@ class TyrantTest < Minitest::Spec
       step Tyrant::Auth.method(:decrypt_value)
     end
 
-    ctx = Tyrant.(activity, value: api_key, cipher_key: cipher_key)
+    ctx, success = Tyrant.(activity, value: api_key, cipher_key: cipher_key)
 
     ctx.inspect.must_equal %{{:value=>\"720fa5a6-9a83-4290-9542-86502bc4fb54\", :cipher_key=>\"e1e1cc87asdfasdfasdfasfdasdfasdfasvhnfvbdb\", :encrypted_value=>\"CC0D7407C3C8B71A8B601A6DDB49CA058EE5FB3F6AD1CDC268C7C72B6CDBA222DA66818AAB12256F\", :decrypted_value=>\"720fa5a6-9a83-4290-9542-86502bc4fb54\"}}
 
@@ -116,6 +120,7 @@ class TyrantTest < Minitest::Spec
       end
     end
 
+    # Provide `Credentials` and `:decrypted_value`.
     builder = Class.new(Trailblazer::Activity::Railway) do
       step :build_credentials
       step :assign_encrypted_value # TODO: use "Zoom" ?
@@ -130,8 +135,11 @@ class TyrantTest < Minitest::Spec
       end
     end
 
+    pw_check = Class.new(builder) do
+      step Tyrant::Auth.method(:compare_passwords)
+    end
 
-    ctx = Tyrant.(activity, cipher_key: cipher_key, username: "apotonick@gmail.com")
+    ctx, success = Tyrant.(activity, cipher_key: cipher_key, username: "apotonick@gmail.com")
 
     data = ctx[:api_auth_data]
 
@@ -144,12 +152,18 @@ class TyrantTest < Minitest::Spec
 
 
 # deserialize and decrypt
-    ctx = Tyrant.(builder, cipher_key: cipher_key, data: data.to_h)
+    ctx, success = Tyrant.(builder, cipher_key: cipher_key, data: data.to_h)
 
     ctx[:credentials].class.must_equal Tyrant::Auth::Credentials
-    ctx[:decrypted_value].must_match /^\w\w\w\w\w\w\w\w-/
-
+    ctx[:decrypted_value].must_match /^\w\w\w\w\w\w\w\w-/ # decrypted UUID.
 
     pp ctx
+    password = ctx[:decrypted_value]
+
+# password correct?
+    ctx, success = Tyrant.(pw_check, cipher_key: cipher_key, data: data.to_h, password: "bla")
+    success.must_equal false
+    ctx, success = Tyrant.(pw_check, cipher_key: cipher_key, data: data.to_h, password: password)
+    success.must_equal true
   end
 end
