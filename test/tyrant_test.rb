@@ -43,7 +43,7 @@ module Tyrant
     end
 
     def timestamp(ctx, **)
-      ctx[:created_at] = DateTime.now
+      ctx[:created_at] = DateTime.now.strftime("%+") # DISCUSS: should this be DateTime and then transform in to_json?
     end
 
     def des_assigned(ctx, **)
@@ -59,7 +59,7 @@ module Tyrant
     class Credentials < Dry::Struct
       attribute :username, Types::String
       attribute :password, Types::String
-      attribute :created_at, Types::DateTime
+      attribute :created_at, Types::String # DISCUSS: should this be DateTime and then transform in to_json?
       attribute :state, Types::String
       attribute :type, Types::String
     end
@@ -91,6 +91,7 @@ class TyrantTest < Minitest::Spec
   end
 
   it "sample flow of creating an API key" do
+    # Create serializable Credentials struct.
     activity = Class.new(Trailblazer::Activity::Railway) do
       step :validate
       step :create_random_key
@@ -115,14 +116,40 @@ class TyrantTest < Minitest::Spec
       end
     end
 
+    builder = Class.new(Trailblazer::Activity::Railway) do
+      step :build_credentials
+      step :assign_encrypted_value # TODO: use "Zoom" ?
+      step Tyrant::Auth.method(:decrypt_value)#, input: {encrypted_value: :encrypted_value, cipher_key: :cipher_key}
+
+      def build_credentials(ctx, data:, **)
+        ctx[:credentials] = Tyrant::Auth::Credentials.new(data)
+      end
+
+      def assign_encrypted_value(ctx, credentials:, **)
+        ctx[:encrypted_value] = credentials.password
+      end
+    end
+
+
     ctx = Tyrant.(activity, cipher_key: cipher_key, username: "apotonick@gmail.com")
 
-    assert_exposes ctx[:api_auth_data].to_h,#.must_equal({})
+    data = ctx[:api_auth_data]
+
+    assert_exposes data.to_h,#.must_equal({})
       username: "apotonick@gmail.com",
       password: ->(actual:, **) { actual =~ /^\w+$/ },
       state:    "password assigned",
       type:     "des-cipher",
-      created_at: ->(actual:, **) { actual < DateTime.now }
+      created_at: ->(actual:, **) { DateTime.parse(actual) < DateTime.now }
 
+
+# deserialize and decrypt
+    ctx = Tyrant.(builder, cipher_key: cipher_key, data: data.to_h)
+
+    ctx[:credentials].class.must_equal Tyrant::Auth::Credentials
+    ctx[:decrypted_value].must_match /^\w\w\w\w\w\w\w\w-/
+
+
+    pp ctx
   end
 end
