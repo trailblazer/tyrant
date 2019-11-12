@@ -11,7 +11,7 @@ Minitest::Spec.module_eval do
   module AssertExposes
     def assert_exposes(hash, expected)
       return super(hash, expected, reader: :[]) if hash.is_a?(Hash)
-      return super
+      super
     end
   end
   include AssertExposes
